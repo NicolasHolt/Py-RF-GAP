@@ -1,12 +1,14 @@
 from collections import Counter
 from sklearn.ensemble import RandomForestRegressor
+from numpy.typing import ArrayLike
 
 class GAPRegressor(RandomForestRegressor):
 
     def __init___(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-
+    #Were you trying to import a specific type for X? The types in sklearn are usually just for understanding of
+    # what can be passed in and not actual types. ArrayLike is a valid Numpy type though
     def fit(self, X: MatrixLike | ArrayLike,
     y: MatrixLike | ArrayLike,
     sample_weight: ArrayLike | None = None):
@@ -21,11 +23,11 @@ class GAPRegressor(RandomForestRegressor):
             # get the samples used for training
             # create a set of the samples used for training
             # count the number of times each sample is used and put into a dictionary
-            samples = dict(Counter(estimator.tree_.n_node_samples))
+            samples = dict(Counter(super().estimators_samples_[index]))
             estimator_data = {
                 "estimator_samples_set": set(samples.keys()),
                 "estimator_samples_count": samples,
-                "leaves": [{"set_": set(), "length_": 0}] * estimator.tree_.n_leaves_ 
+                "leaves": [{"set_": set(), "length_": 0}] * estimator.tree_.n_leaves
             }
 
             # X has shape (n_samples, n_features)
