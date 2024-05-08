@@ -37,7 +37,7 @@ class GAPRegressor(RandomForestRegressor):
             estimator_data = {
                 "tree_samples_set": set(samples.keys()),
                 "tree_sample_count_dict": samples,
-                "leaves": [{"leaf_set_": set(), "leaf_size_": 0}] * estimator.tree_.n_leaves
+                "leaves_dict": [{"leaf_set_": set(), "leaf_size_": 0}] * estimator.tree_.n_leaves
             }
             oob_trees[index] = samples_set - estimator_data["tree_samples_set"]
             itb_trees[index] = estimator_data["tree_samples_set"]
@@ -48,8 +48,8 @@ class GAPRegressor(RandomForestRegressor):
             leaf_indicies = estimator.apply(in_bag_samples)
 
             for i, j in zip(in_bag_samples, leaf_indicies):
-                estimator_data["leaves"][j]["leaf_set_"].add(i)
-                estimator_data["leaves"][j]["leaf_size_"] += samples[i]
+                estimator_data["leaves_dict"][j]["leaf_set_"].add(i)
+                estimator_data["leaves_dict"][j]["leaf_size_"] += samples[i]
 
             tree_dict_list.append(estimator_data)
 
@@ -71,8 +71,8 @@ class GAPRegressor(RandomForestRegressor):
                 c_j = estimator_data["tree_sample_count_dict"][sample_index]
                 for i, leaf_index in enumerate(leaf_indicies):
                     # i provides the i value in the range of [0, n)
-                    if sample_index in estimator_data["leaves"][leaf_index]["leaf_set_"]:
-                        result[i, sample_index] += c_j / estimator_data["leaves"][leaf_index]["leaf_size_"]
+                    if sample_index in estimator_data["leaves_dict"][leaf_index]["leaf_set_"]:
+                        result[i, sample_index] += c_j / estimator_data["leaves_dict"][leaf_index]["leaf_size_"]
                         
         return result * factor
                     
@@ -92,11 +92,11 @@ class GAPRegressor(RandomForestRegressor):
                     # get the leaf index for sample index_i
                     leaf_index = super().estimators_[oob_tree].apply(self._training_data_[index_i])
 
-                    if index_j not in estimator_data["leaves"][leaf_index]["leaf_set_"]:
+                    if index_j not in estimator_data["leaves_dict"][leaf_index]["leaf_set_"]:
                         continue
 
                     c_j = estimator_data["tree_sample_count_dict"][index_j]
-                    m_cardinality = estimator_data["leaves"][leaf_index]["leaf_size_"]
+                    m_cardinality = estimator_data["leaves_dict"][leaf_index]["leaf_size_"]
 
                     acc += c_j / m_cardinality
 
