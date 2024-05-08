@@ -2,6 +2,7 @@ from collections import Counter
 from sklearn.ensemble import RandomForestRegressor
 from numpy.typing import ArrayLike
 import numpy as np
+from collections import defaultdict
 
 class GAPRegressor(RandomForestRegressor):
 
@@ -19,6 +20,7 @@ class GAPRegressor(RandomForestRegressor):
     def __leaf_builder(self, X: ArrayLike):
         # a list that contains the in bag samples for each tree and their corresponding leaves
         tree_dict_list = []
+        inner_dict_structure = {"leaf_set_": set(), "leaf_size_": 0}
 
         # TODO: Verify that we are correctly computing the number of samples... pandas indexing is weird
         # dictionary that maps from sample index to trees OOB 
@@ -37,7 +39,7 @@ class GAPRegressor(RandomForestRegressor):
             estimator_data = {
                 "tree_samples_set": set(samples.keys()),
                 "tree_sample_count_dict": samples,
-                "leaves_dict": [{"leaf_set_": set(), "leaf_size_": 0}] * estimator.tree_.n_leaves
+                "leaves_dict": defaultdict(lambda: inner_dict_structure.copy())
             }
             oob_trees[index] = samples_set - estimator_data["tree_samples_set"]
             itb_trees[index] = estimator_data["tree_samples_set"]
@@ -47,9 +49,9 @@ class GAPRegressor(RandomForestRegressor):
             in_bag_samples = X[in_bag_samples]
             leaf_indicies = estimator.apply(in_bag_samples)
 
-            for i, j in zip(in_bag_samples, leaf_indicies):
-                estimator_data["leaves_dict"][j]["leaf_set_"].add(i)
-                estimator_data["leaves_dict"][j]["leaf_size_"] += samples[i]
+            for sample, leaf_index in zip(in_bag_samples, leaf_indicies):
+                estimator_data["leaves_dict"][leaf_index]["leaf_set_"].add(sample)
+                estimator_data["leaves_dict"][leaf_index]["leaf_size_"] += samples[sample]
 
             tree_dict_list.append(estimator_data)
 
