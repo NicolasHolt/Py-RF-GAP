@@ -18,7 +18,7 @@ class GAPRegressor(RandomForestRegressor):
     
     def __leaf_builder(self, X: ArrayLike):
         # a list that contains the in bag samples for each tree and their corresponding leaves
-        estimator_computed = []
+        tree_dict_list = []
 
         # TODO: Verify that we are correctly computing the number of samples... pandas indexing is weird
         # dictionary that maps from sample index to trees OOB 
@@ -35,25 +35,25 @@ class GAPRegressor(RandomForestRegressor):
             # count the number of times each sample is used and put into a dictionary
             samples = dict(Counter(super().estimators_samples_[index]))
             estimator_data = {
-                "estimator_samples_set": set(samples.keys()),
-                "estimator_samples_count": samples,
-                "leaves": [{"set_": set(), "length_": 0}] * estimator.tree_.n_leaves
+                "tree_samples_set": set(samples.keys()),
+                "tree_sample_count_dict": samples,
+                "leaves": [{"leaf_set_": set(), "leaf_size_": 0}] * estimator.tree_.n_leaves
             }
-            oob_trees[index] = samples_set - estimator_data["estimator_samples_set"]
-            itb_trees[index] = estimator_data["estimator_samples_set"]
+            oob_trees[index] = samples_set - estimator_data["tree_samples_set"]
+            itb_trees[index] = estimator_data["tree_samples_set"]
 
             # X has shape (n_samples, n_features)
-            to_compute = list(estimator_data["estimator_samples_set"])
-            in_bag_samples = X[to_compute]
+            in_bag_samples = list(estimator_data["tree_samples_set"])
+            in_bag_samples = X[in_bag_samples]
             leaf_indicies = estimator.apply(in_bag_samples)
 
-            for i, j in zip(to_compute, leaf_indicies):
-                estimator_data["leaves"][j]["set_"].add(i)
-                estimator_data["leaves"][j]["length_"] += samples[i]
+            for i, j in zip(in_bag_samples, leaf_indicies):
+                estimator_data["leaves"][j]["leaf_set_"].add(i)
+                estimator_data["leaves"][j]["leaf_size_"] += samples[i]
 
-            estimator_computed.append(estimator_data)
+            tree_dict_list.append(estimator_data)
 
-        self._estimator_computed_ = estimator_computed
+        self._tree_dict_list_ = tree_dict_list
         self._oob_trees_ = oob_trees
         self._itb_trees_ = itb_trees
 
@@ -63,16 +63,16 @@ class GAPRegressor(RandomForestRegressor):
         factor = 1 / self._num_samples_
         result = np.zeros((np.shape(X)[0], self._num_samples_))
 
-        for index, estimator_data in enumerate(self._estimator_computed_):
+        for index, estimator_data in enumerate(self._tree_dict_list_):
             leaf_indicies = super().estimators_[index].apply(X)
 
-            for sample_index in estimator_data["estimator_samples_set"]:
+            for sample_index in estimator_data["tree_samples_set"]:
                 # sample_index provides the j value in the range of [0, s)
-                c_j = estimator_data["estimator_samples_count"][sample_index]
+                c_j = estimator_data["tree_sample_count_dict"][sample_index]
                 for i, leaf_index in enumerate(leaf_indicies):
                     # i provides the i value in the range of [0, n)
-                    if sample_index in estimator_data["leaves"][leaf_index]["set_"]:
-                        result[i, sample_index] += c_j / estimator_data["leaves"][leaf_index]["length_"]
+                    if sample_index in estimator_data["leaves"][leaf_index]["leaf_set_"]:
+                        result[i, sample_index] += c_j / estimator_data["leaves"][leaf_index]["leaf_size_"]
                         
         return result * factor
                     
@@ -87,16 +87,16 @@ class GAPRegressor(RandomForestRegressor):
             if index_j is not None:
                 # iterate over trees where sample index_i is OOB and sample index_j is in bag
                 for oob_tree in oob_trees_i.intersection(self._itb_trees_[index_j]):
-                    estimator_data = self._estimator_computed_[oob_tree]
+                    estimator_data = self._tree_dict_list_[oob_tree]
 
                     # get the leaf index for sample index_i
                     leaf_index = super().estimators_[oob_tree].apply(self._training_data_[index_i])
 
-                    if index_j not in estimator_data["leaves"][leaf_index]["set_"]:
+                    if index_j not in estimator_data["leaves"][leaf_index]["leaf_set_"]:
                         continue
 
-                    c_j = estimator_data["estimator_samples_count"][index_j]
-                    m_cardinality = estimator_data["leaves"][leaf_index]["length_"]
+                    c_j = estimator_data["tree_sample_count_dict"][index_j]
+                    m_cardinality = estimator_data["leaves"][leaf_index]["leaf_size_"]
 
                     acc += c_j / m_cardinality
 
