@@ -47,9 +47,9 @@ class GAPRegressor(RandomForestRegressor):
             # X has shape (n_samples, n_features)
             in_bag_samples = list(estimator_data["tree_samples_set"])
             in_bag_samples = X[in_bag_samples]
-            leaf_indicies = estimator.apply(in_bag_samples)
+            leaf_indices = estimator.apply(in_bag_samples)
 
-            for sample, leaf_index in zip(in_bag_samples, leaf_indicies):
+            for sample, leaf_index in zip(in_bag_samples, leaf_indices):
                 estimator_data["leaves_dict"][leaf_index]["leaf_set_"].add(sample)
                 estimator_data["leaves_dict"][leaf_index]["leaf_size_"] += samples[sample]
 
@@ -66,12 +66,12 @@ class GAPRegressor(RandomForestRegressor):
         result = np.zeros((np.shape(X)[0], self._num_samples_))
 
         for index, estimator_data in enumerate(self._tree_dict_list_):
-            leaf_indicies = super().estimators_[index].apply(X)
+            leaf_indices = super().estimators_[index].apply(X)
 
             for sample_index in estimator_data["tree_samples_set"]:
                 # sample_index provides the j value in the range of [0, s)
                 c_j = estimator_data["tree_sample_count_dict"][sample_index]
-                for i, leaf_index in enumerate(leaf_indicies):
+                for i, leaf_index in enumerate(leaf_indices):
                     # i provides the i value in the range of [0, n)
                     if sample_index in estimator_data["leaves_dict"][leaf_index]["leaf_set_"]:
                         result[i, sample_index] += c_j / estimator_data["leaves_dict"][leaf_index]["leaf_size_"]
