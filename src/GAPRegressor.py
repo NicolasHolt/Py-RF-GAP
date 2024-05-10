@@ -80,6 +80,8 @@ class GAPRegressor(RandomForestRegressor):
                     if sample_index in estimator_data["leaves_dict"][leaf_index]["leaf_set_"]:
                         result[i, sample_index] += c_j / estimator_data["leaves_dict"][leaf_index]["leaf_size_"]
                         
+        # similarity = np.einsum('lkm,nmk->ln', INPUT, TREE)
+
         return result * factor
                     
 
