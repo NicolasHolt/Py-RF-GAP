@@ -5,6 +5,7 @@ import numpy as np
 from collections import defaultdict
 from copy import deepcopy
 
+
 class GAPRegressor(RandomForestRegressor):
 
     def __init___(self, *args, **kwargs):
@@ -17,51 +18,54 @@ class GAPRegressor(RandomForestRegressor):
         super().fit(X, y)
         self.__leaf_builder(X)
         return self
-    
+
     def __leaf_builder(self, X: ArrayLike):
-        # a list that contains the in bag samples for each tree and their corresponding leaves
-        tree_dict_list = []
-        inner_dict_structure = {"leaf_set_": set(), "leaf_size_": 0}
+        # a list of matrices which encode the multiplicity of each sample and size of each leaf for each tree
+        tree_matrices = []
+        inner_dict_structure = {"leaf_size_": 0}
 
         # TODO: Verify that we are correctly computing the number of samples... pandas indexing is weird
-        # dictionary that maps from sample index to trees OOB 
-        oob_trees = {k: set() for k in range(np.shape(X)[0])}
-        itb_trees = {k: set() for k in range(np.shape(X)[0])}
-        
-        # set of all samples
-        samples_set = set(range(np.shape(X)[0]))
+
         self._num_samples_ = np.shape(X)[0]
+        self._max_leaf_count_ = 0
+        for estimator in super().estimators_:
+            self._max_leaf_count_ = max(estimator.tree_.n_leaves, self._max_leaf_count_)
 
         for index, estimator in enumerate(super().estimators_):
             # get the samples used for training
             # create a set of the samples used for training
             # count the number of times each sample is used and put into a dictionary
-            samples = dict(Counter(super().estimators_samples_[index]))
-            estimator_data = {
-                "tree_samples_set": set(samples.keys()),
-                "tree_sample_count_dict": samples,
-                "leaves_dict": defaultdict(lambda: deepcopy(inner_dict_structure))
-            }
-            oob_trees[index] = samples_set - estimator_data["tree_samples_set"]
-            itb_trees[index] = estimator_data["tree_samples_set"]
+            samples_count = dict(Counter(super().estimators_samples_[index]))
 
             # X has shape (n_samples, n_features)
-            in_bag_samples = list(estimator_data["tree_samples_set"])
-            in_bag_samples = X[in_bag_samples]
+            in_bag_sample_ids = list(samples_count.keys())
+            in_bag_samples = X[in_bag_sample_ids]
             leaf_indices = estimator.apply(in_bag_samples)
 
-            for sample, leaf_index in zip(in_bag_samples, leaf_indices):
-                estimator_data["leaves_dict"][leaf_index]["leaf_set_"].add(sample)
-                estimator_data["leaves_dict"][leaf_index]["leaf_size_"] += samples[sample]
 
-            # for i, v in enumerate(estimator_data["leaves_dict"].values()):
-            #     v['id'] = i
+            leaf_attributes = defaultdict(lambda: deepcopy(inner_dict_structure))
+            sample_to_leaf = {sample: leaf_index for sample, leaf_index in zip(in_bag_samples, leaf_indices)}
+            for sample, leaf_index in sample_to_leaf.items():
+                leaf_attributes[leaf_index]['leaf_size_'] += samples_count[sample]
+
+            for i, v in enumerate(leaf_attributes.values()):
+                v['id'] = i
 
             tree_dict_list.append(estimator_data)
 
-        self._tree_dict_list_ = tree_dict_list
-        self._oob_trees_ = oob_trees
-        self._itb_trees_ = itb_trees
+
+
+            tree_matrices.append(
+                np.array(
+                    np.concatenate(
+                        [np.eye(1, self._max_leaf_count_, leaf_attributes[sample_to_leaf[i]]['id'])
+                         * samples_count[i] / leaf_attributes[sample_to_leaf[i]]['leaf_size_']
+                         if i in samples_count.keys() else np.zeros((1, self._max_leaf_count_))
+                         for i in range(self._num_samples_)], axis=0
+                    )
+                )
+            )
+        self._ensemble_tensor_ = np.dstack(tuple(tree_matrices))
 
     def similarity(self, X: ArrayLike):
         # X is gonna be n x m_features
@@ -79,14 +83,13 @@ class GAPRegressor(RandomForestRegressor):
                     # i provides the i value in the range of [0, n)
                     if sample_index in estimator_data["leaves_dict"][leaf_index]["leaf_set_"]:
                         result[i, sample_index] += c_j / estimator_data["leaves_dict"][leaf_index]["leaf_size_"]
-                        
-        # similarity = np.einsum('lkm,nmk->ln', INPUT, TREE)
+
+        # todo similarity = np.einsum('lkm,nmk->ln', INPUT, TREE)
 
         return result * factor
-                    
 
     def training_similarity(self, index_i: int, index_j: int | None = None):
-        
+
         def get_similarity(index_i: int, index_j: int):
             if index_i == index_j:
                 return 1
@@ -107,11 +110,10 @@ class GAPRegressor(RandomForestRegressor):
 
                 acc += c_j / m_cardinality
 
-                    
             return acc * (1 / len(oob_trees_i))
-        
+
         if index_j is not None:
             return [get_similarity(index_i, index_j)]
-        
+
         return [get_similarity(index_i, j) for j in range(len(self._num_samples_))]
 
