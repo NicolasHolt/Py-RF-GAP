@@ -23,6 +23,7 @@ class GAPRegressor(RandomForestRegressor):
         # a list of matrices which encode the multiplicity of each sample and size of each leaf for each tree
         tree_matrices = []
         inner_dict_structure = {"leaf_size_": 0}
+        out_of_bag_matrix = []
 
         # TODO: Verify that we are correctly computing the number of samples... pandas indexing is weird
 
@@ -42,6 +43,8 @@ class GAPRegressor(RandomForestRegressor):
             in_bag_samples = X[in_bag_sample_ids]
             leaf_indices = estimator.apply(in_bag_samples)
 
+            in_bag_sample_ids_set = set(in_bag_sample_ids)
+            out_of_bag_matrix.append([0 if i in in_bag_sample_ids_set else 1 for i in range(self._num_samples_)])
 
             leaf_attributes = defaultdict(lambda: deepcopy(inner_dict_structure))
             sample_to_leaf = {sample: leaf_index for sample, leaf_index in zip(in_bag_samples, leaf_indices)}
@@ -62,23 +65,24 @@ class GAPRegressor(RandomForestRegressor):
                 )
             )
         self._ensemble_tensor_ = np.dstack(tuple(tree_matrices))
+        self._out_of_bag_matrix_ = np.array(out_of_bag_matrix)
 
     def similarity(self, X: ArrayLike):
         # X is gonna be n x m_features
         # Return a matrix of shape n x s where s is the number of samples in the training set
-        factor = 1 / self._num_samples_
-        result = np.zeros((np.shape(X)[0], self._num_samples_))
+        # factor = 1 / self._num_samples_
+        # result = np.zeros((np.shape(X)[0], self._num_samples_))
 
-        for index, estimator_data in enumerate(self._tree_dict_list_):
-            leaf_indices = super().estimators_[index].apply(X)
+        # for index, estimator_data in enumerate(self._tree_dict_list_):
+        #     leaf_indices = super().estimators_[index].apply(X)
 
-            for sample_index in estimator_data["tree_samples_set"]:
-                # sample_index provides the j value in the range of [0, s)
-                c_j = estimator_data["tree_sample_count_dict"][sample_index]
-                for i, leaf_index in enumerate(leaf_indices):
-                    # i provides the i value in the range of [0, n)
-                    if sample_index in estimator_data["leaves_dict"][leaf_index]["leaf_set_"]:
-                        result[i, sample_index] += c_j / estimator_data["leaves_dict"][leaf_index]["leaf_size_"]
+        #     for sample_index in estimator_data["tree_samples_set"]:
+        #         # sample_index provides the j value in the range of [0, s)
+        #         c_j = estimator_data["tree_sample_count_dict"][sample_index]
+        #         for i, leaf_index in enumerate(leaf_indices):
+        #             # i provides the i value in the range of [0, n)
+        #             if sample_index in estimator_data["leaves_dict"][leaf_index]["leaf_set_"]:
+        #                 result[i, sample_index] += c_j / estimator_data["leaves_dict"][leaf_index]["leaf_size_"]
 
         # todo similarity = np.einsum('lkm,nmk->ln', INPUT, TREE)
 
