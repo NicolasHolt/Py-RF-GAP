@@ -51,10 +51,6 @@ class GAPRegressor(RandomForestRegressor):
             for i, v in enumerate(leaf_attributes.values()):
                 v['id'] = i
 
-            tree_dict_list.append(estimator_data)
-
-
-
             tree_matrices.append(
                 np.array(
                     np.concatenate(
