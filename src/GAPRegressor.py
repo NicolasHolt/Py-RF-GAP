@@ -29,6 +29,8 @@ class GAPRegressor(RandomForestRegressor):
 
         self._num_samples_ = np.shape(X)[0]
         self._max_leaf_count_ = 0
+        self._samples_range_list_ = np.arange(self._num_samples_)
+        self._leaf_to_matrix_ = []
         for estimator in super().estimators_:
             self._max_leaf_count_ = max(estimator.tree_.n_leaves, self._max_leaf_count_)
 
@@ -43,8 +45,7 @@ class GAPRegressor(RandomForestRegressor):
             in_bag_samples = X[in_bag_sample_ids]
             leaf_indices = estimator.apply(in_bag_samples)
 
-            in_bag_sample_ids_set = set(in_bag_sample_ids)
-            out_of_bag_matrix.append([0 if i in in_bag_sample_ids_set else 1 for i in range(self._num_samples_)])
+            out_of_bag_matrix.append(np.isin(self._samples_range_list_, in_bag_sample_ids, invert=True).astype(int))
 
             leaf_attributes = defaultdict(lambda: deepcopy(inner_dict_structure))
             sample_to_leaf = {sample: leaf_index for sample, leaf_index in zip(in_bag_samples, leaf_indices)}
@@ -64,6 +65,7 @@ class GAPRegressor(RandomForestRegressor):
                     )
                 )
             )
+        # todo mayhaps remove leaf_size, such woah
         self._ensemble_tensor_ = np.dstack(tuple(tree_matrices))
         self._out_of_bag_matrix_ = np.array(out_of_bag_matrix)
 
@@ -88,16 +90,20 @@ class GAPRegressor(RandomForestRegressor):
 
         return result * factor
 
-    def training_similarity(self, index_i: int, index_j: int | None = None):
+    def training_similarity(self, index_i: int | None = None):
+        oob_mat = self._out_of_bag_matrix_[index_i, :] if index_i else self._out_of_bag_matrix_
+        mapped_leaves = super().apply(self._training_data_[index_i, :]) if index_i else super().apply(self._training_data_)
+        tree_matrices = []
+        for k in range(len(super().estimators_)):
+            tree_matrices.append(
+                np.array(
+                    np.concatenate(
+                        [np.eye(1, self._max_leaf_count_, self._leaf_to_matrix_[k][mapped_leaves[i, k]]['id'])
+                         for i in range(mapped_leaves.shape[0])], axis=0)
+                    )
+            )
+        training_tensor = np.dstack(tuple(tree_matrices))
 
-        def get_similarity(index_i: int, index_j: int):
-            if index_i == index_j:
-                return 1
-            oob_trees_i = self._oob_trees_[index_i]
-            acc = 0
-            # iterate over trees where sample index_i is OOB and sample index_j is in bag
-            for oob_tree in oob_trees_i.intersection(self._itb_trees_[index_j]):
-                estimator_data = self._tree_dict_list_[oob_tree]
 
                 # get the leaf index for sample index_i
                 leaf_index = super().estimators_[oob_tree].apply(self._training_data_[index_i])
