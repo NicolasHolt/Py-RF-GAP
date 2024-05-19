@@ -15,7 +15,7 @@ class GAPRegressor(RandomForestRegressor):
             y: ArrayLike,
             sample_weight: ArrayLike | None = None):
         self._training_data_ = X
-        super().fit(X, y)
+        super().fit(X, y, sample_weight)
         self.__leaf_builder(X)
         return self
 
@@ -31,14 +31,14 @@ class GAPRegressor(RandomForestRegressor):
         self._max_leaf_count_ = 0
         self._samples_range_list_ = np.arange(self._num_samples_)
         self._leaf_to_matrix_ = []
-        for estimator in super().estimators_:
+        for estimator in self.estimators_:
             self._max_leaf_count_ = max(estimator.tree_.n_leaves, self._max_leaf_count_)
 
-        for index, estimator in enumerate(super().estimators_):
+        for index, estimator in enumerate(self.estimators_):
             # get the samples used for training
             # create a set of the samples used for training
             # count the number of times each sample is used and put into a dictionary
-            samples_count = dict(Counter(super().estimators_samples_[index]))
+            samples_count = dict(Counter(self.estimators_samples_[index]))
 
             # X has shape (n_samples, n_features)
             in_bag_sample_ids = list(samples_count.keys())
@@ -48,7 +48,7 @@ class GAPRegressor(RandomForestRegressor):
             out_of_bag_matrix.append(np.isin(self._samples_range_list_, in_bag_sample_ids, invert=True).astype(int))
 
             leaf_attributes = defaultdict(lambda: deepcopy(inner_dict_structure))
-            sample_to_leaf = {sample: leaf_index for sample, leaf_index in zip(in_bag_samples, leaf_indices)}
+            sample_to_leaf = {sample: leaf_index for sample, leaf_index in zip(in_bag_sample_ids, leaf_indices)}
             for sample, leaf_index in sample_to_leaf.items():
                 leaf_attributes[leaf_index]['leaf_size_'] += samples_count[sample]
 
@@ -70,7 +70,7 @@ class GAPRegressor(RandomForestRegressor):
         self._out_of_bag_matrix_ = np.array(out_of_bag_matrix)
 
     def similarity(self, X: ArrayLike):
-        factor = len(super().estimators_)
+        factor = len(self.estimators_)
         mapped_leaves = super().apply(X)
         tree_matrices = []
         for k in range(factor):
@@ -87,10 +87,10 @@ class GAPRegressor(RandomForestRegressor):
         return np.divide(similarity_unweighted, factor)
 
     def training_similarity(self, index_i: int | None = None):
-        oob_mat = self._out_of_bag_matrix_[:, index_i] if index_i else self._out_of_bag_matrix_
-        mapped_leaves = super().apply(self._training_data_[index_i, :]) if index_i else super().apply(self._training_data_)
+        oob_mat = self._out_of_bag_matrix_[:, index_i].reshape(len(self._out_of_bag_matrix_),1) if index_i is not None else self._out_of_bag_matrix_
+        mapped_leaves = self.apply([self._training_data_[index_i, :]]) if index_i is not None else self.apply(self._training_data_)
         tree_matrices = []
-        for k in range(len(super().estimators_)):
+        for k in range(len(self.estimators_)):
             tree_matrices.append(
                 np.array(
                     np.concatenate(
