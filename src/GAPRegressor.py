@@ -70,25 +70,21 @@ class GAPRegressor(RandomForestRegressor):
         self._out_of_bag_matrix_ = np.array(out_of_bag_matrix)
 
     def similarity(self, X: ArrayLike):
-        # X is gonna be n x m_features
-        # Return a matrix of shape n x s where s is the number of samples in the training set
-        # factor = 1 / self._num_samples_
-        # result = np.zeros((np.shape(X)[0], self._num_samples_))
+        factor = len(super().estimators_)
+        mapped_leaves = super().apply(X)
+        tree_matrices = []
+        for k in range(factor):
+            tree_matrices.append(
+                np.array(
+                    np.concatenate(
+                        [np.eye(1, self._max_leaf_count_, self._leaf_to_matrix_[k][mapped_leaves[i, k]]['id'])
+                         for i in range(mapped_leaves.shape[0])], axis=0)
+                )
+            )
+        applied_tensor = np.dstack(tuple(tree_matrices))
 
-        # for index, estimator_data in enumerate(self._tree_dict_list_):
-        #     leaf_indices = super().estimators_[index].apply(X)
-
-        #     for sample_index in estimator_data["tree_samples_set"]:
-        #         # sample_index provides the j value in the range of [0, s)
-        #         c_j = estimator_data["tree_sample_count_dict"][sample_index]
-        #         for i, leaf_index in enumerate(leaf_indices):
-        #             # i provides the i value in the range of [0, n)
-        #             if sample_index in estimator_data["leaves_dict"][leaf_index]["leaf_set_"]:
-        #                 result[i, sample_index] += c_j / estimator_data["leaves_dict"][leaf_index]["leaf_size_"]
-
-        # todo similarity = np.einsum('lmk,nmk->ln', INPUT, TREE)
-
-        return result * factor
+        similarity_unweighted = np.einsum('lmk,nmk->ln', applied_tensor, self._ensemble_tensor_)
+        return np.divide(similarity_unweighted, factor)
 
     def training_similarity(self, index_i: int | None = None):
         oob_mat = self._out_of_bag_matrix_[:, index_i] if index_i else self._out_of_bag_matrix_
@@ -105,9 +101,5 @@ class GAPRegressor(RandomForestRegressor):
         training_tensor = np.dstack(tuple(tree_matrices))
 
         intermediate_tensor = np.einsum('lmk,nmk->lnk', training_tensor, self._ensemble_tensor_)
-
         similarity_unweighted = np.einsum('lnk,kl->ln', intermediate_tensor, oob_mat)
-
-        similarity =  np.divide(similarity_unweighted, np.sum(oob_mat, axis=0))
-
-        return similarity
+        return np.divide(similarity_unweighted, np.sum(oob_mat, axis=0))
