@@ -86,12 +86,12 @@ class GAPRegressor(RandomForestRegressor):
         #             if sample_index in estimator_data["leaves_dict"][leaf_index]["leaf_set_"]:
         #                 result[i, sample_index] += c_j / estimator_data["leaves_dict"][leaf_index]["leaf_size_"]
 
-        # todo similarity = np.einsum('lkm,nmk->ln', INPUT, TREE)
+        # todo similarity = np.einsum('lmk,nmk->ln', INPUT, TREE)
 
         return result * factor
 
     def training_similarity(self, index_i: int | None = None):
-        oob_mat = self._out_of_bag_matrix_[index_i, :] if index_i else self._out_of_bag_matrix_
+        oob_mat = self._out_of_bag_matrix_[:, index_i] if index_i else self._out_of_bag_matrix_
         mapped_leaves = super().apply(self._training_data_[index_i, :]) if index_i else super().apply(self._training_data_)
         tree_matrices = []
         for k in range(len(super().estimators_)):
@@ -104,22 +104,10 @@ class GAPRegressor(RandomForestRegressor):
             )
         training_tensor = np.dstack(tuple(tree_matrices))
 
+        intermediate_tensor = np.einsum('lmk,nmk->lnk', training_tensor, self._ensemble_tensor_)
 
-                # get the leaf index for sample index_i
-                leaf_index = super().estimators_[oob_tree].apply(self._training_data_[index_i])
+        similarity_unweighted = np.einsum('lnk,kl->ln', intermediate_tensor, oob_mat)
 
-                if index_j not in estimator_data["leaves_dict"][leaf_index]["leaf_set_"]:
-                    continue
+        similarity =  np.divide(similarity_unweighted, np.sum(oob_mat, axis=0))
 
-                c_j = estimator_data["tree_sample_count_dict"][index_j]
-                m_cardinality = estimator_data["leaves_dict"][leaf_index]["leaf_size_"]
-
-                acc += c_j / m_cardinality
-
-            return acc * (1 / len(oob_trees_i))
-
-        if index_j is not None:
-            return [get_similarity(index_i, index_j)]
-
-        return [get_similarity(index_i, j) for j in range(len(self._num_samples_))]
-
+        return similarity
