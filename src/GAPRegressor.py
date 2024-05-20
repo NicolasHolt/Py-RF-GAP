@@ -102,4 +102,5 @@ class GAPRegressor(RandomForestRegressor):
 
         intermediate_tensor = np.einsum('lmk,nmk->lnk', training_tensor, self._ensemble_tensor_)
         similarity_unweighted = np.einsum('lnk,kl->ln', intermediate_tensor, oob_mat)
-        return np.divide(similarity_unweighted, np.sum(oob_mat, axis=0))
+        similarities = np.divide(similarity_unweighted, np.sum(oob_mat, axis=0))
+        return np.add(similarities, np.eye(1, len(self._training_data_))) if index_i is not None else np.add(similarities, np.diag(np.ones(len(self._training_data_))))
