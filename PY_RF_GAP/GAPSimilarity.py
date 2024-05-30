@@ -47,6 +47,7 @@ class GAPSimilarity:
 
             for i, v in enumerate(leaf_attributes.values()):
                 v['id'] = i
+            self._leaf_to_matrix_.append(leaf_attributes)
 
             tree_matrices.append(
                 np.array(

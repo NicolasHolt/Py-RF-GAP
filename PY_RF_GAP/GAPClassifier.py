@@ -1,5 +1,5 @@
 from sklearn.ensemble import RandomForestClassifier
-from src.GAPSimilarity import GAPSimilarity
+from PY_RF_GAP.GAPSimilarity import GAPSimilarity
 from numpy.typing import ArrayLike
 
 class GAPClassifier(RandomForestClassifier):
