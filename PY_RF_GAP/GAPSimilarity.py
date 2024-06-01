@@ -63,7 +63,7 @@ class GAPSimilarity:
         self._ensemble_tensor_ = np.dstack(tuple(tree_matrices))
         self._out_of_bag_matrix_ = np.array(out_of_bag_matrix)
 
-    def similarity(self, X: ArrayLike):
+    def similarity(self, X: ArrayLike) -> ArrayLike:
         factor = len(self.random_forest.estimators_)
         mapped_leaves = self.random_forest.apply(X)
         tree_matrices = []
@@ -81,7 +81,7 @@ class GAPSimilarity:
         return np.divide(similarity_unweighted, factor)
 
 
-    def training_similarity(self, index_i: int | None = None):
+    def training_similarity(self, index_i: int | None = None) -> ArrayLike:
         oob_mat = self._out_of_bag_matrix_[:, index_i].reshape(len(self._out_of_bag_matrix_),1) if index_i is not None else self._out_of_bag_matrix_
         mapped_leaves = self.random_forest.apply([self._training_data_[index_i, :]]) if index_i is not None else self.random_forest.apply(self._training_data_)
         tree_matrices = []

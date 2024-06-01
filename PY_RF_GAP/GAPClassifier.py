@@ -15,11 +15,49 @@ class GAPClassifier(RandomForestClassifier):
         return self
     
     def similarity(self, X: ArrayLike):
+        """
+        Calculate the similarity scores of the given data using the trained GAP classifier.
+
+        Parameters
+        ----------
+        X : ArrayLike
+            The input data for which to calculate the similarity score. 
+            This should not be an empty array.
+
+        Raises
+        ------
+        ValueError
+            If the GAP classifier has not been fit before calling this method.
+
+        Returns
+        -------
+        ArrayLike
+            The similarity score calculated by the GAP classifier.
+        """
         if self.gap_classifier is None:
             raise ValueError("Model has not been fit")
         return self.gap_classifier.similarity(X)
     
     def training_similarity(self, index_i: int | None = None):
+        """
+        Calculate the similarity scores of either the .
+
+        Parameters
+        ----------
+        X : ArrayLike
+            The input data for which to calculate the similarity score. 
+            This should not be an empty array.
+
+        Raises
+        ------
+        ValueError
+            If the GAP classifier has not been fit before calling this method.
+
+        Returns
+        -------
+        ArrayLike
+            The similarity score calculated by the GAP classifier.
+        """
         if self.gap_classifier is None:
             raise ValueError("Model has not been fit")
         return self.gap_classifier.training_similarity(index_i)
