@@ -13,6 +13,8 @@ class GAPSimilarity:
         self.__leaf_builder(X)
 
     def __leaf_builder(self, X: ArrayLike):
+        if isinstance(X, list):
+            X = np.array(X)
         # a list of matrices which encode the multiplicity of each sample and size of each leaf for each tree
         tree_matrices = []
         inner_dict_structure = {"leaf_size_": 0}
@@ -64,6 +66,8 @@ class GAPSimilarity:
         self._out_of_bag_matrix_ = np.array(out_of_bag_matrix)
 
     def similarity(self, X: ArrayLike) -> ArrayLike:
+        if isinstance(X, list):
+            X = np.array(X)
         factor = len(self.random_forest.estimators_)
         mapped_leaves = self.random_forest.apply(X)
         tree_matrices = []
@@ -82,6 +86,8 @@ class GAPSimilarity:
 
 
     def training_similarity(self, index_i: int | None = None) -> ArrayLike:
+        if index_i is not None and index_i >= len(self._training_data_):
+            raise ValueError("Index out of bounds")
         oob_mat = self._out_of_bag_matrix_[:, index_i].reshape(len(self._out_of_bag_matrix_),1) if index_i is not None else self._out_of_bag_matrix_
         mapped_leaves = self.random_forest.apply([self._training_data_[index_i, :]]) if index_i is not None else self.random_forest.apply(self._training_data_)
         tree_matrices = []
@@ -97,5 +103,7 @@ class GAPSimilarity:
 
         intermediate_tensor = np.einsum('lmk,nmk->lnk', training_tensor, self._ensemble_tensor_)
         similarity_unweighted = np.einsum('lnk,kl->ln', intermediate_tensor, oob_mat)
-        similarities = np.divide(similarity_unweighted, np.sum(oob_mat, axis=0))
-        return np.add(similarities, np.eye(1, len(self._training_data_))) if index_i is not None else np.add(similarities, np.diag(np.ones(len(self._training_data_))))
+        oob_sum_mat = np.sum(oob_mat, axis=0)
+        oob_sum_mat = np.where(oob_sum_mat == 0, 1, oob_sum_mat)
+        similarities = np.divide(similarity_unweighted.T, oob_sum_mat).T
+        return np.add(similarities, np.eye(1, len(self._training_data_), index_i)) if index_i is not None else np.add(similarities, np.diag(np.ones(len(self._training_data_))))
