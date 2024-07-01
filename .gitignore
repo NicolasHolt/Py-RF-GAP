@@ -1,0 +1,7 @@
+*__pycache__*
+.conda/
+.pytest_cache/
+dist/
+build/
+PY_RF_GAP.egg-info/
+.DS_Store

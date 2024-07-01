@@ -10,6 +10,25 @@ class GAPClassifier(RandomForestClassifier):
     def fit(self, X: ArrayLike,
             y: ArrayLike,
             sample_weight: ArrayLike | None = None):
+        """
+        Fit the GAP classifier to the given data.
+
+        Parameters
+        ----------
+        X : ArrayLike
+            The input data to fit the model to.
+
+        y : ArrayLike
+            The target labels to fit the model to.
+
+        sample_weight : ArrayLike | None
+            The sample weights to apply to the training data.
+        
+        Returns
+        -------
+        GAPClassifier
+            The fitted GAP classifier.
+        """
         super().fit(X, y, sample_weight)
         self.gap_classifier = GAPSimilarity(self, X)
         return self
@@ -40,13 +59,14 @@ class GAPClassifier(RandomForestClassifier):
     
     def training_similarity(self, index_i: int | None = None):
         """
-        Calculate the similarity scores of either the .
+        Calculate the similarity scores of either the training data point at index `index_i` 
+        or the entire training dataset if `index_i` is `None`.
 
         Parameters
         ----------
-        X : ArrayLike
-            The input data for which to calculate the similarity score. 
-            This should not be an empty array.
+        index_i : int | None
+            The input index for which to calculate the similarity score.
+            If `None`, the similarity score for the entire training dataset is calculated.
 
         Raises
         ------
